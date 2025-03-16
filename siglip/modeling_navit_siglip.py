@@ -300,6 +300,8 @@ class SiglipVisionEmbeddings(nn.Module):
         self.embed_dim = config.hidden_size
         self.image_size = config.image_size
         self.patch_size = config.patch_size
+        self.pixel_values_shape = config.pixel_values_shape
+        self.device = None
 
         self.patch_embedding = nn.Conv2d(
             in_channels=config.num_channels,
@@ -315,38 +317,37 @@ class SiglipVisionEmbeddings(nn.Module):
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
 
     def forward(self, pixel_values: torch.FloatTensor, patch_attention_mask: torch.BoolTensor, tgt_sizes: Optional[torch.IntTensor]=None) -> torch.Tensor:
-        batch_size = pixel_values.size(0)
+        batch_size = self.pixel_values_shape[0]
+        self.device = self.position_embedding.weight.device
 
         patch_embeds = self.patch_embedding(pixel_values)
         embeddings = patch_embeds.flatten(2).transpose(1, 2)
 
-        max_im_h, max_im_w = pixel_values.size(2), pixel_values.size(3)
+        max_im_h, max_im_w = self.pixel_values_shape[2], self.pixel_values_shape[3]
         max_nb_patches_h, max_nb_patches_w = max_im_h // self.patch_size, max_im_w // self.patch_size
-        boundaries = torch.arange(1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side)
+        boundaries = torch.arange(1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side, device=self.device)
         position_ids = torch.full(
             size=(
                 batch_size,
                 max_nb_patches_h * max_nb_patches_w,
             ),
             fill_value=0,
+            device=self.device,
         )
 
-        for batch_idx, p_attn_mask in enumerate(patch_attention_mask):
-            if tgt_sizes is not None:
-                nb_patches_h = tgt_sizes[batch_idx][0]
-                nb_patches_w = tgt_sizes[batch_idx][1]
-            else:
-                nb_patches_h = p_attn_mask[:, 0].sum()
-                nb_patches_w = p_attn_mask[0].sum()
+        for batch_idx in range(batch_size):
+            p_attn_mask = patch_attention_mask[batch_idx]
+            nb_patches_h = tgt_sizes[batch_idx][0]
+            nb_patches_w = tgt_sizes[batch_idx][1]
 
-            fractional_coords_h = torch.arange(0, 1 - 1e-6, 1 / nb_patches_h)
-            fractional_coords_w = torch.arange(0, 1 - 1e-6, 1 / nb_patches_w)
+            fractional_coords_h = torch.arange(0, 1 - 1e-6, 1 / nb_patches_h, device=self.device)
+            fractional_coords_w = torch.arange(0, 1 - 1e-6, 1 / nb_patches_w, device=self.device)
 
             bucket_coords_h = torch.bucketize(fractional_coords_h, boundaries, right=True)
             bucket_coords_w = torch.bucketize(fractional_coords_w, boundaries, right=True)
 
             pos_ids = (bucket_coords_h[:, None] * self.num_patches_per_side + bucket_coords_w).flatten()
-            position_ids[batch_idx][p_attn_mask.view(-1).cpu()] = pos_ids
+            position_ids[batch_idx][p_attn_mask.view(-1)] = pos_ids
 
         position_ids = position_ids.to(self.position_embedding.weight.device)
 
