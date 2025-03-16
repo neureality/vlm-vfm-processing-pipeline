@@ -7,6 +7,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 model = VFM()
 model = model.to(device="cuda", dtype=torch.bfloat16)
+model.eval()
 
 all_pixel_values = torch.load(
     "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/all_pixel_values.pkl",
