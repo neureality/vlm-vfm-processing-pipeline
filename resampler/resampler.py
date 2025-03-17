@@ -147,8 +147,17 @@ class Resampler(nn.Module):
             pos_embed.append(self.pos_embed[:tgt_h, :tgt_w, :].reshape((tgt_h * tgt_w, -1)).to(dtype))  # patches * D
             key_padding_mask[i, patch_len[i]:] = True
 
-        pos_embed = torch.nn.utils.rnn.pad_sequence(
-            pos_embed, batch_first=True, padding_value=0.0).permute(1, 0, 2)  # BLD => L * B * D
+        max_length = max(t.size(0) for t in pos_embed)
+        padded_tensors = []
+        for t in pos_embed:
+            pad_size = max_length - t.size(0)
+            padded_t = F.pad(t, (0, 0, 0, pad_size), value=0.0)  # Right pad
+            padded_tensors.append(padded_t)
+            
+        pos_embed = torch.stack(padded_tensors, dim=0).permute(1, 0, 2) # BLD => L * B * D
+
+        # pos_embed = torch.nn.utils.rnn.pad_sequence(
+        #     pos_embed, batch_first=True, padding_value=0.0).permute(1, 0, 2)  # BLD => L * B * D
 
         x = self.kv_proj(x)  # B * L * D
         x = self.ln_kv(x).permute(1, 0, 2)  # L * B * D

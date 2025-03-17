@@ -15,6 +15,18 @@
             },
             "python": "/home/ubuntu/vlm-vfm-processing-pipeline/.venv/bin/python",
             "justMyCode": false,
+        }, 
+
+        {
+            "name": "torch_to_onnx.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/torch_to_onnx.py",
+            "console": "integratedTerminal",
+            "env": {
+            },
+            "python": "/home/ubuntu/vlm-vfm-processing-pipeline/.venv/bin/python",
+            "justMyCode": false,
         }
     ]
 }
