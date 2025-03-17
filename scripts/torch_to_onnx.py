@@ -2,12 +2,38 @@ import torch
 import torch.nn as nn
 import onnx
 import onnxruntime as ort
+from onnx import numpy_helper
 import numpy as np
 import os
 from typing import List, Dict, Tuple, Optional, Union
 
-from vfm import VFM
-
+def fix_onnx_fp16(
+    gen_models_path: str,
+    model_base_name: str,
+) -> str:
+    finfo = np.finfo(np.float16)
+    fp16_max = finfo.max
+    fp16_min = finfo.min
+    model = onnx.load(f"{gen_models_path}/{model_base_name}.onnx")
+    fp16_fix = False
+    for tensor in onnx.external_data_helper._get_all_tensors(model):
+        nptensor = numpy_helper.to_array(tensor, gen_models_path)
+        if nptensor.dtype == np.float32 and (
+            np.any(nptensor > fp16_max) or np.any(nptensor < fp16_min)
+        ):
+            # print(f'tensor value : {nptensor} above {fp16_max} or below {fp16_min}')
+            nptensor = np.clip(nptensor, fp16_min, fp16_max)
+            new_tensor = numpy_helper.from_array(nptensor, tensor.name)
+            tensor.CopyFrom(new_tensor)
+            fp16_fix = True
+            
+    if fp16_fix:
+        # Save FP16 model
+        print("Found constants out of FP16 range, clipped to FP16 range")
+        model_base_name += "_fix_outofrange_fp16"
+        onnx.save(model, f=f"{gen_models_path}/{model_base_name}.onnx")
+        print(f"Saving modified onnx file at {gen_models_path}/{model_base_name}.onnx")
+    return model_base_name
 
 def convert_pytorch_to_onnx(
     model: nn.Module,
@@ -174,52 +200,3 @@ def convert_pytorch_to_onnx(
 
     print(f"ONNX model saved to: {onnx_path}")
     return onnx_path
-
-
-if __name__ == "__main__":
-
-    device = "cpu"
-    dtype = torch.float32
-    # Instantiate the model
-    model = VFM(device=device, dtype=dtype)
-    model.eval()  # Set model to evaluation mode
-
-    all_pixel_values = torch.load(
-        "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/all_pixel_values.pkl",
-        weights_only=True,
-        map_location=device,
-    )
-    patch_attn_mask = torch.load(
-        "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/patch_attn_mask.pkl",
-        weights_only=True,
-        map_location=device,
-    )
-    tgt_sizes = torch.load(
-        "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/tgt_sizes.pkl",
-        weights_only=True,
-        map_location=device,
-    )
-
-    # Set dynamic axes for inputs/outputs
-    dynamic_axes = {
-        "all_pixel_values": {0: "batch_size"},
-        "patch_attn_mask": {0: "batch_size"},
-        "tgt_sizes": {0: "batch_size"},
-        "vision_embedding": {0: "batch_size"},
-    }
-
-    convert_pytorch_to_onnx(
-        model=model,
-        input_sample=(all_pixel_values, patch_attn_mask, tgt_sizes),
-        onnx_path="models/vfm.onnx",
-        input_names=["all_pixel_values", "patch_attn_mask", "tgt_sizes"],
-        output_names=["vision_embedding"],
-        dynamic_axes=dynamic_axes,
-        opset_version=19,  # Higher opset for newer operators
-        export_params=True,  # Include model weights
-        do_constant_folding=True,  # Optimize constant operations
-        verbose=True,  # Show detailed conversion info
-        training=torch.onnx.TrainingMode.EVAL,  # Export in inference mode
-        enable_onnx_checker=True,  # Verify model structure
-        optimize_onnx=False,  # Apply optimizations
-    )
