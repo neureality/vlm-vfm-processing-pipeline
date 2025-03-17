@@ -301,6 +301,7 @@ class SiglipVisionEmbeddings(nn.Module):
         self.image_size = config.image_size
         self.patch_size = config.patch_size
         self.pixel_values_shape = config.pixel_values_shape
+        self.batch_size = config.batch_size
         self.device = None
 
         self.patch_embedding = nn.Conv2d(
@@ -317,13 +318,13 @@ class SiglipVisionEmbeddings(nn.Module):
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
 
     def forward(self, pixel_values: torch.FloatTensor, patch_attention_mask: torch.BoolTensor, tgt_sizes: Optional[torch.IntTensor]=None) -> torch.Tensor:
-        batch_size = self.pixel_values_shape[0]
+        batch_size = self.batch_size
         self.device = self.position_embedding.weight.device
 
         patch_embeds = self.patch_embedding(pixel_values)
         embeddings = patch_embeds.flatten(2).transpose(1, 2)
 
-        max_im_h, max_im_w = self.pixel_values_shape[2], self.pixel_values_shape[3]
+        max_im_h, max_im_w = self.pixel_values_shape[1], self.pixel_values_shape[2]
         max_nb_patches_h, max_nb_patches_w = max_im_h // self.patch_size, max_im_w // self.patch_size
         boundaries = torch.arange(1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side, device=self.device)
         position_ids = torch.full(
