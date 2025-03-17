@@ -1,4 +1,8 @@
 {
+    "resize_global": [336, 602],
+    "resize_refine": [ 476, 840],
+    "crop_best_grid": [ 1, 2],
+    "patch_size": 14,
     "batch_size": 30,
     "pixel_values_shape":  [3, 14, 14448],
     "drop_vision_last_layer": false,
@@ -12,6 +16,6 @@
     "num_attention_heads": 16,
     "num_channels": 3,
     "num_hidden_layers": 27,
-    "patch_size": 14,
+    
     "transformers_version": "4.45.2"
 }

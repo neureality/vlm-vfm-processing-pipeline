@@ -300,7 +300,7 @@ class SiglipVisionEmbeddings(nn.Module):
         self.embed_dim = config.hidden_size
         self.image_size = config.image_size
         self.patch_size = config.patch_size
-        self.pixel_values_shape = config.pixel_values_shape
+        self.pixel_values_shape = config.pixel_values_shape # Set for 720x1280 HD videos only.
         self.batch_size = config.batch_size
         self.device = None
 
@@ -316,8 +316,57 @@ class SiglipVisionEmbeddings(nn.Module):
         self.num_patches = self.num_patches_per_side**2
         self.num_positions = self.num_patches
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
+        # Compute tgt_sizes from config 🌵
+        tgt_sizes_tensor = self._compute_tgt_sizes_from_config(config)
+        # Register tgt_sizes as buffer so it moves to device later 🌵
+        self.register_buffer("tgt_sizes", tgt_sizes_tensor)
+        
+    
+    def _compute_tgt_sizes_from_config(self, config):
+        # 1. Parse relevant config entries
+        batch_size = config.batch_size                # e.g. 30
+        patch_size = config.patch_size                # e.g. 14
+        resize_global = config.resize_global          # e.g. [336, 602]
+        resize_refine = config.resize_refine          # e.g. [476, 840]
+        grid = config.crop_best_grid                  # e.g. [1, 2]
 
-    def forward(self, pixel_values: torch.FloatTensor, patch_attention_mask: torch.BoolTensor, tgt_sizes: Optional[torch.IntTensor]=None) -> torch.Tensor:
+        # 2. Compute the global slice’s patch dimensions
+        global_h, global_w = resize_global
+        global_tgt = (global_h // patch_size, global_w // patch_size)
+        # e.g. (336 // 14, 602 // 14) -> (24, 43)
+
+        # 3. Compute how many refine patches we create per frame
+        #    For grid=[1, 2], we produce 1 row * 2 columns = 2 refine patches per frame
+        refine_h, refine_w = resize_refine
+        patch_h = refine_h // grid[0]   # e.g. 476 // 1 = 476
+        patch_w = refine_w // grid[1]   # e.g. 840 // 2 = 420
+        refine_tgt = (patch_h // patch_size, patch_w // patch_size)
+        # e.g. (476 // 14, 420 // 14) -> (34, 30)
+
+        # 4. Each frame => 1 global slice + grid[0]*grid[1] refine slices
+        #    For each slice, we store the patch dimension as a (H//patch_size, W//patch_size)
+        num_refine_slices = grid[0] * grid[1]  # e.g. 2
+        slices_per_frame = 1 + num_refine_slices  # e.g. 3 total slices per frame
+
+        # 5. Build the per-frame pattern, then repeat for batch_size frames
+        frame_pattern = [global_tgt] + [refine_tgt] * num_refine_slices
+        # e.g. [ (24,43), (34,30), (34,30) ]
+        repeated_list = frame_pattern * (batch_size // slices_per_frame)
+        # e.g. repeated_list has length 3 * (30/3) = 30 if batch_size=30 and slices_per_frame=3
+
+        # 6. Convert to a PyTorch tensor on the desired device
+        #    dtype can be int32 or int64, depending on your usage
+        tgt_sizes = torch.tensor(repeated_list,
+                                 dtype=torch.int64)
+        
+        return tgt_sizes
+
+    def forward(
+        self,
+        pixel_values: torch.FloatTensor,
+        patch_attention_mask: torch.BoolTensor,
+        # tgt_sizes: Optional[torch.IntTensor]=None 🌵
+        ) -> torch.Tensor:
         batch_size = self.batch_size
         self.device = self.position_embedding.weight.device
 
@@ -338,8 +387,8 @@ class SiglipVisionEmbeddings(nn.Module):
 
         for batch_idx in range(batch_size):
             p_attn_mask = patch_attention_mask[batch_idx]
-            nb_patches_h = tgt_sizes[batch_idx][0]
-            nb_patches_w = tgt_sizes[batch_idx][1]
+            nb_patches_h = self.tgt_sizes[batch_idx][0]
+            nb_patches_w = self.tgt_sizes[batch_idx][1]
 
             fractional_coords_h = torch.arange(0, 1 - 1e-6, 1 / nb_patches_h, device=self.device)
             fractional_coords_w = torch.arange(0, 1 - 1e-6, 1 / nb_patches_w, device=self.device)
@@ -877,7 +926,7 @@ class SiglipVisionTransformer(SiglipPreTrainedModel):
         self,
         pixel_values,
         patch_attention_mask: Optional[torch.BoolTensor] = None,
-        tgt_sizes: Optional[torch.IntTensor] = None,
+        # tgt_sizes: Optional[torch.IntTensor] = None, # Now computed with from config 🌵
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -903,7 +952,10 @@ class SiglipVisionTransformer(SiglipPreTrainedModel):
                 device=pixel_values.device,
             )
 
-        hidden_states = self.embeddings(pixel_values=pixel_values, patch_attention_mask=patch_attention_mask, tgt_sizes=tgt_sizes)
+        hidden_states = self.embeddings(pixel_values=pixel_values,
+                                        patch_attention_mask=patch_attention_mask,
+                                        # tgt_sizes=tgt_sizes # <- compute statically from config 🌵
+                                        )
 
         patch_attention_mask = patch_attention_mask.view(batch_size, -1)
         # The call to `_upad_input` in `_flash_attention_forward` is expensive

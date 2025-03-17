@@ -60,7 +60,10 @@ class VFM(nn.Module):
         self.resampler.load_state_dict(
             torch.load(resampler_state_dict_path, weights_only=True)
         )
-        self.vpm.load_state_dict(torch.load(vpm_state_dict_path, weights_only=True))
+        self.vpm.load_state_dict(
+            torch.load(vpm_state_dict_path, weights_only=True),
+            strict=False # ignore missing keys -> tgt_sizes registered buffer is missing 🌵
+            ) 
 
     def forward(
         self,
@@ -75,7 +78,7 @@ class VFM(nn.Module):
             all_pixel_values = all_pixel_values.to(self.dtype)
 
         vision_embedding = self.vpm(
-            all_pixel_values, patch_attention_mask=patch_attn_mask, tgt_sizes=tgt_sizes
+            all_pixel_values, patch_attention_mask=patch_attn_mask
         ).last_hidden_state
         vision_embedding = self.resampler(vision_embedding, tgt_sizes)
 
