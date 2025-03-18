@@ -320,6 +320,14 @@ class SiglipVisionEmbeddings(nn.Module):
         self.pre_computed_tgt_sizes = self._pre_compute_tgt_sizes(config)
         # Pre Compute position_ids 🌵
         self.pre_computed_position_ids = self._pre_compute_position_ids()
+        
+        # Pre-compute slice indices (total number of patches per batch element) 🌵
+        slice_indices = []
+        for batch_idx in range(config.batch_size):
+            h, w = self.pre_computed_tgt_sizes[batch_idx].tolist()
+            slice_indices.append(h * w)  # Total number of patches
+        
+        self.register_buffer("pre_computed_slice_indices", torch.tensor(slice_indices, dtype=torch.long))
     
     def _pre_compute_tgt_sizes(self, config):
         # 1. Parse relevant config entries
@@ -396,10 +404,12 @@ class SiglipVisionEmbeddings(nn.Module):
         
         # Apply the patch attention mask
         for batch_idx in range(batch_size):
+            # Get slice index as a Python integer, not a tensor
+            slice_idx = int(self.pre_computed_slice_indices[batch_idx].item())
             p_attn_mask = patch_attention_mask[batch_idx]
             # Only select the positions we need based on the mask
-            valid_positions = position_ids[batch_idx, :p_attn_mask.sum()]
-            embeddings[batch_idx, p_attn_mask.flatten()] += self.position_embedding(valid_positions)
+            valid_positions = position_ids[batch_idx, :slice_idx]
+            embeddings[batch_idx, :slice_idx] += self.position_embedding(valid_positions)
         
         return embeddings
 
