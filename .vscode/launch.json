@@ -18,10 +18,10 @@
         }, 
 
         {
-            "name": "torch_to_onnx.py",
+            "name": "convert_torch_to_onnx.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/torch_to_onnx.py",
+            "program": "${workspaceFolder}/convert_torch_to_onnx.py",
             "console": "integratedTerminal",
             "env": {
             },

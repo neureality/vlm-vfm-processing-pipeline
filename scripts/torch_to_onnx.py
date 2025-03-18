@@ -132,8 +132,7 @@ def convert_pytorch_to_onnx(
     # Verify the ONNX model
     if enable_onnx_checker:
         print("Checking ONNX model...")
-        onnx_model = onnx.load(onnx_path)
-        onnx.checker.check_model(onnx_model)
+        onnx.checker.check_model(onnx_path)
         print("ONNX model is valid!")
 
     # Optimize the ONNX model if requested

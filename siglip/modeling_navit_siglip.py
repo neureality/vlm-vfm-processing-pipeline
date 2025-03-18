@@ -316,13 +316,12 @@ class SiglipVisionEmbeddings(nn.Module):
         self.num_patches = self.num_patches_per_side**2
         self.num_positions = self.num_patches
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
-        # Compute tgt_sizes from config 🌵
-        tgt_sizes_tensor = self._compute_tgt_sizes_from_config(config)
-        # Register tgt_sizes as buffer so it moves to device later 🌵
-        self.register_buffer("tgt_sizes", tgt_sizes_tensor)
-        
+        # Pre Compute tgt_sizes 🌵
+        self.pre_computed_tgt_sizes = self._pre_compute_tgt_sizes(config)
+        # Pre Compute position_ids 🌵
+        self.pre_computed_position_ids = self._pre_compute_position_ids()
     
-    def _compute_tgt_sizes_from_config(self, config):
+    def _pre_compute_tgt_sizes(self, config):
         # 1. Parse relevant config entries
         batch_size = config.batch_size                # e.g. 30
         patch_size = config.patch_size                # e.g. 14
@@ -356,54 +355,53 @@ class SiglipVisionEmbeddings(nn.Module):
 
         # 6. Convert to a PyTorch tensor on the desired device
         #    dtype can be int32 or int64, depending on your usage
-        tgt_sizes = torch.tensor(repeated_list,
-                                 dtype=torch.int64)
+        tgt_sizes = torch.tensor(repeated_list, dtype=torch.int64)
         
         return tgt_sizes
-
-    def forward(
-        self,
-        pixel_values: torch.FloatTensor,
-        patch_attention_mask: torch.BoolTensor,
-        # tgt_sizes: Optional[torch.IntTensor]=None 🌵
-        ) -> torch.Tensor:
+    
+    def _pre_compute_position_ids(self):
         batch_size = self.batch_size
-        self.device = self.position_embedding.weight.device
-
-        patch_embeds = self.patch_embedding(pixel_values)
-        embeddings = patch_embeds.flatten(2).transpose(1, 2)
-
-        max_im_h, max_im_w = self.pixel_values_shape[1], self.pixel_values_shape[2]
-        max_nb_patches_h, max_nb_patches_w = max_im_h // self.patch_size, max_im_w // self.patch_size
-        boundaries = torch.arange(1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side, device=self.device)
-        position_ids = torch.full(
-            size=(
-                batch_size,
-                max_nb_patches_h * max_nb_patches_w,
-            ),
-            fill_value=0,
-            device=self.device,
-        )
-
+        device = torch.device('cpu')  # Will move to correct device later
+        position_ids = torch.zeros(batch_size, self.num_patches, dtype=torch.long)
+        
+        # Boundaries calculation (moved to CPU for pre-computation)
+        boundaries = torch.arange(1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side)
+        
         for batch_idx in range(batch_size):
-            p_attn_mask = patch_attention_mask[batch_idx]
-            nb_patches_h = self.tgt_sizes[batch_idx][0]
-            nb_patches_w = self.tgt_sizes[batch_idx][1]
-
-            fractional_coords_h = torch.arange(0, 1 - 1e-6, 1 / nb_patches_h, device=self.device)
-            fractional_coords_w = torch.arange(0, 1 - 1e-6, 1 / nb_patches_w, device=self.device)
-
+            nb_patches_h = self.pre_computed_tgt_sizes[batch_idx][0].item()
+            nb_patches_w = self.pre_computed_tgt_sizes[batch_idx][1].item()
+            
+            # Pre-compute the fractional coordinates
+            fractional_coords_h = torch.arange(0, 1 - 1e-6, 1 / nb_patches_h)
+            fractional_coords_w = torch.arange(0, 1 - 1e-6, 1 / nb_patches_w)
+            
             bucket_coords_h = torch.bucketize(fractional_coords_h, boundaries, right=True)
             bucket_coords_w = torch.bucketize(fractional_coords_w, boundaries, right=True)
-
+            
             pos_ids = (bucket_coords_h[:, None] * self.num_patches_per_side + bucket_coords_w).flatten()
-            position_ids[batch_idx][p_attn_mask.view(-1)] = pos_ids
+            position_ids[batch_idx, :pos_ids.size(0)] = pos_ids
+        
+        return position_ids
 
-        position_ids = position_ids.to(self.position_embedding.weight.device)
 
-        embeddings = embeddings + self.position_embedding(position_ids)
+    def forward(self, pixel_values, patch_attention_mask):
+        batch_size = self.batch_size
+        self.device = self.position_embedding.weight.device
+        
+        patch_embeds = self.patch_embedding(pixel_values)
+        embeddings = patch_embeds.flatten(2).transpose(1, 2)
+        
+        # Use pre-computed position IDs, moved to the current device
+        position_ids = self.pre_computed_position_ids.to(self.device)
+        
+        # Apply the patch attention mask
+        for batch_idx in range(batch_size):
+            p_attn_mask = patch_attention_mask[batch_idx]
+            # Only select the positions we need based on the mask
+            valid_positions = position_ids[batch_idx, :p_attn_mask.sum()]
+            embeddings[batch_idx, p_attn_mask.flatten()] += self.position_embedding(valid_positions)
+        
         return embeddings
-
 
 class SiglipAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
