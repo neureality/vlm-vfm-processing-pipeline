@@ -2,7 +2,7 @@ import torch
 from vfm import VFM
 from scripts.torch_to_onnx import fix_onnx_fp16, convert_pytorch_to_onnx
 
-OPSET_VERSION = 12
+OPSET_VERSION = 11
 device = "cpu"
 dtype = torch.float32
 # Instantiate the model
@@ -29,15 +29,23 @@ tgt_sizes = torch.load(
 dynamic_axes = {
     "all_pixel_values": {0: "batch_size"},
     "patch_attn_mask": {0: "batch_size"},
-    "tgt_sizes": {0: "batch_size"},
+    # "tgt_sizes": {0: "batch_size"},
     "vision_embedding": {0: "batch_size"},
 }
 
 convert_pytorch_to_onnx(
     model=model,
-    input_sample=(all_pixel_values, patch_attn_mask, tgt_sizes),
+    input_sample=(
+        all_pixel_values,
+        patch_attn_mask,
+        # tgt_sizes
+        ),
     onnx_path="models/vfm.onnx",
-    input_names=["all_pixel_values", "patch_attn_mask", "tgt_sizes"],
+    input_names=[
+        "all_pixel_values",
+        "patch_attn_mask",
+        # "tgt_sizes"
+        ],
     output_names=["vision_embedding"],
     dynamic_axes=dynamic_axes,
     opset_version=OPSET_VERSION,  # Higher opset for newer operators

@@ -81,6 +81,7 @@ class Resampler(nn.Module):
             norm_layer=partial(nn.LayerNorm, eps=1e-6),
             adaptive=False,
             max_size=(70, 70),
+            pre_computed_tgt_sizes=None,
     ):
         super().__init__()
         self.num_queries = num_queries
@@ -88,6 +89,7 @@ class Resampler(nn.Module):
         self.num_heads = num_heads
         self.adaptive = adaptive
         self.max_size = max_size
+        self.register_buffer("pre_computed_tgt_sizes", pre_computed_tgt_sizes) # 🌵
 
         self.query = nn.Parameter(torch.zeros(self.num_queries, embed_dim))
 
@@ -127,7 +129,8 @@ class Resampler(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def forward(self, x, tgt_sizes=None):
+    def forward(self, x):
+        tgt_sizes = self.pre_computed_tgt_sizes
         assert x.shape[0] == tgt_sizes.shape[0]
         bs = x.shape[0]
 
