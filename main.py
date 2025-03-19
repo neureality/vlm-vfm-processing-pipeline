@@ -29,6 +29,5 @@ with torch.inference_mode():
     vision_embedding = model(
         all_pixel_values,
         patch_attn_mask,
-        # tgt_sizes
         )
 pass

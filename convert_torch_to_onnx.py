@@ -29,7 +29,6 @@ tgt_sizes = torch.load(
 dynamic_axes = {
     "all_pixel_values": {0: "batch_size"},
     "patch_attn_mask": {0: "batch_size"},
-    # "tgt_sizes": {0: "batch_size"},
     "vision_embedding": {0: "batch_size"},
 }
 
@@ -38,13 +37,11 @@ convert_pytorch_to_onnx(
     input_sample=(
         all_pixel_values,
         patch_attn_mask,
-        # tgt_sizes
         ),
     onnx_path="models/vfm.onnx",
     input_names=[
         "all_pixel_values",
         "patch_attn_mask",
-        # "tgt_sizes"
         ],
     output_names=["vision_embedding"],
     dynamic_axes=dynamic_axes,
