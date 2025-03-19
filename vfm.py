@@ -24,29 +24,9 @@ class VFM(nn.Module):
         pre_computed_tgt_sizes = self._pre_compute_tgt_sizes(self.siglip_config)
         self.register_buffer("pre_computed_tgt_sizes", pre_computed_tgt_sizes)
         
-        self.vpm = self.init_vision_module()
         self.resampler = self.init_resampler()
         self.load_model_weights()
 
-
-    def init_vision_module(self) -> nn.Module:
-        # same as HuggingFaceM4/siglip-so400m-14-980-flash-attn2-navit add tgt_sizes
-        if self.siglip_config._attn_implementation == "flash_attention_2":
-            self.siglip_config._attn_implementation = "flash_attention_2"
-        else:
-            # not suport sdpa
-            self.siglip_config._attn_implementation = "eager"
-        model = SiglipVisionTransformer(
-            self.siglip_config,
-            self.pre_computed_tgt_sizes
-            )
-        if self.siglip_config.drop_vision_last_layer:
-            model.encoder.layers = model.encoder.layers[:-1]
-
-        setattr(model, "embed_dim", model.embeddings.embed_dim)
-        setattr(model, "patch_size", model.embeddings.patch_size)
-
-        return model
 
     def init_resampler(self) -> nn.Module:
         # The resampler in 2.6 remains consistent with the one in 2.5.
@@ -102,32 +82,22 @@ class VFM(nn.Module):
     def load_model_weights(
         self,
         resampler_state_dict_path: str = RESAMPLER_STATE_DICT_PATH,
-        vpm_state_dict_path: str = SIGLIP_STATE_DICT_PATH,
     ) -> None:
         self.resampler.load_state_dict(
             torch.load(resampler_state_dict_path, weights_only=True),
             strict=False # ignore missing keys 🌵
         )
-        self.vpm.load_state_dict(
-            torch.load(vpm_state_dict_path, weights_only=True),
-            strict=False # ignore missing keys 🌵
-            ) 
 
     def forward(
         self,
-        all_pixel_values: torch.Tensor,
-        patch_attn_mask: torch.Tensor,
-        # tgt_sizes: torch.Tensor,
+        vision_embedding: torch.Tensor,
     ) -> torch.Tensor:
-        if all_pixel_values.dtype != self.dtype:
+        if vision_embedding.dtype != self.dtype:
             print(
-                f"Current dtype of all_pixel_values is {all_pixel_values.dtype}, Converting all_pixel_values to {self.dtype}"
+                f"Current dtype of vision_embedding is {vision_embedding.dtype}, Converting vision_embedding to {self.dtype}"
             )
-            all_pixel_values = all_pixel_values.to(self.dtype)
+            vision_embedding = vision_embedding.to(self.dtype)
 
-        vision_embedding = self.vpm(
-            all_pixel_values, patch_attention_mask=patch_attn_mask
-        ).last_hidden_state
         vision_embedding = self.resampler(vision_embedding)
 
         return vision_embedding

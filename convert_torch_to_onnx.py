@@ -9,44 +9,26 @@ dtype = torch.float32
 model = VFM(device=device, dtype=dtype)
 model.eval()  # Set model to evaluation mode
 
-all_pixel_values = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/all_pixel_values.pkl",
+vision_embedding = torch.load(
+    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/vision_embedding_only_siglip.pt",
     weights_only=True,
     map_location=device,
-)
-patch_attn_mask = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/patch_attn_mask.pkl",
-    weights_only=True,
-    map_location=device,
-)
-tgt_sizes = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/tgt_sizes.pkl",
-    weights_only=True,
-    map_location=device,
-)
+).to(dtype)
 
 # Set dynamic axes for inputs/outputs
 dynamic_axes = {
-    "all_pixel_values": {0: "batch_size"},
-    "patch_attn_mask": {0: "batch_size"},
-    # "tgt_sizes": {0: "batch_size"},
     "vision_embedding": {0: "batch_size"},
+    "vision_embedding_out": {0: "batch_size"},
 }
 
 convert_pytorch_to_onnx(
     model=model,
-    input_sample=(
-        all_pixel_values,
-        patch_attn_mask,
-        # tgt_sizes
-        ),
-    onnx_path="models/vfm.onnx",
+    input_sample=(vision_embedding,),
+    onnx_path="models/vfm_only_resampler.onnx",
     input_names=[
-        "all_pixel_values",
-        "patch_attn_mask",
-        # "tgt_sizes"
-        ],
-    output_names=["vision_embedding"],
+        "vision_embedding",
+    ],
+    output_names=["vision_embedding_out"],
     dynamic_axes=dynamic_axes,
     opset_version=OPSET_VERSION,  # Higher opset for newer operators
     export_params=True,  # Include model weights
@@ -61,5 +43,5 @@ convert_pytorch_to_onnx(
 # Fix the ONNX model for mixed precision
 fp16_model_name = fix_onnx_fp16(
     gen_models_path="models",
-    model_base_name="vfm",
+    model_base_name="vfm_only_resampler",
 )
