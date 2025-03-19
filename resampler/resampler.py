@@ -133,48 +133,53 @@ class Resampler(nn.Module):
         tgt_sizes = self.pre_computed_tgt_sizes
         assert x.shape[0] == tgt_sizes.shape[0]
         bs = x.shape[0]
-
         device = x.device
         dtype = x.dtype
 
+        # Pre-compute max possible patch dimensions from max_size
+        max_h, max_w = self.max_size
+        max_possible_patches = max_h * max_w
+
+        # Create statically sized position embeddings array
         patch_len = tgt_sizes[:, 0] * tgt_sizes[:, 1]
-
-        self._adjust_pos_cache(tgt_sizes, device=device)
-
-        max_patch_len = torch.max(patch_len)
-        key_padding_mask = torch.zeros((bs, max_patch_len), dtype=torch.bool, device=device)
-
-        pos_embed = []
+        
+        # Use static buffer for key_padding_mask with maximum possible size
+        key_padding_mask = torch.zeros((bs, max_possible_patches), dtype=torch.bool, device=device)
+        
+        # Process position embeddings using static shapes
+        pos_embeddings_static = torch.zeros((max_possible_patches, bs, self.embed_dim), 
+                                            dtype=dtype, device=device)
+        
+        # Fill in the actual position embeddings
         for i in range(bs):
             tgt_h, tgt_w = tgt_sizes[i]
-            pos_embed.append(self.pos_embed[:tgt_h, :tgt_w, :].reshape((tgt_h * tgt_w, -1)).to(dtype))  # patches * D
-            key_padding_mask[i, patch_len[i]:] = True
-
-        max_length = max(t.size(0) for t in pos_embed)
-        padded_tensors = []
-        for t in pos_embed:
-            pad_size = max_length - t.size(0)
-            padded_t = F.pad(t, (0, 0, 0, pad_size), value=0.0)  # Right pad
-            padded_tensors.append(padded_t)
+            current_patches = int(patch_len[i].item())
             
-        pos_embed = torch.stack(padded_tensors, dim=0).permute(1, 0, 2) # BLD => L * B * D
-
-        # pos_embed = torch.nn.utils.rnn.pad_sequence(
-        #     pos_embed, batch_first=True, padding_value=0.0).permute(1, 0, 2)  # BLD => L * B * D
-
+            # Get position embeddings for this batch item
+            current_pos_embed = self.pos_embed[:tgt_h, :tgt_w, :].reshape((tgt_h * tgt_w, -1)).to(dtype)
+            
+            # Copy to the static tensor (no dynamic padding)
+            pos_embeddings_static[:current_patches, i, :] = current_pos_embed
+            
+            # Set padding mask for positions beyond actual content
+            if current_patches < max_possible_patches:
+                key_padding_mask[i, current_patches:] = True
+        
+        # Use the static pos_embed tensor directly (no stack/permute with dynamic shapes)
+        pos_embed = pos_embeddings_static
+        
+        # Rest of the forward method remains the same
         x = self.kv_proj(x)  # B * L * D
         x = self.ln_kv(x).permute(1, 0, 2)  # L * B * D
-
         q = self.ln_q(self.query)  # Q * D
-
+        
         out = self.attn(
             self._repeat(q, bs),  # Q * B * D
-            x + pos_embed,  # L * B * D +  L * B * D
+            x + pos_embed[:x.shape[0]],  # Only use as many positions as in x
             x,
-            key_padding_mask=key_padding_mask)[0]
-        #  out: Q * B * D
+            key_padding_mask=key_padding_mask[:, :x.shape[0]])[0]
+        
         x = out.permute(1, 0, 2)  # B * Q * D
-
         x = self.ln_post(x)
         x = x @ self.proj
         return x
