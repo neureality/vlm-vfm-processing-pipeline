@@ -2,7 +2,7 @@ import torch
 from vfm import VFM
 from scripts.torch_to_onnx import fix_onnx_fp16, convert_pytorch_to_onnx
 
-OPSET_VERSION = 11
+OPSET_VERSION = 13
 device = "cpu"
 dtype = torch.float32
 # Instantiate the model
@@ -39,13 +39,13 @@ convert_pytorch_to_onnx(
         all_pixel_values,
         patch_attn_mask,
         # tgt_sizes
-        ),
+    ),
     onnx_path="models/vfm.onnx",
     input_names=[
         "all_pixel_values",
         "patch_attn_mask",
         # "tgt_sizes"
-        ],
+    ],
     output_names=["vision_embedding"],
     dynamic_axes=dynamic_axes,
     opset_version=OPSET_VERSION,  # Higher opset for newer operators
