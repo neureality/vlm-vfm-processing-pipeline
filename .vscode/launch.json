@@ -13,7 +13,8 @@
             "console": "integratedTerminal",
             "env": {
             },
-            "python": "/home/ubuntu/vlm-vfm-processing-pipeline/.venv/bin/python",
+            // "python": "/home/ubuntu/vlm-vfm-processing-pipeline/.venv/bin/python",
+            "python": "/work/ronliv/ws/vlm-vfm-processing-pipeline/vlm_vfm_processing_pipeline/bin/python",
             "justMyCode": false,
         }, 
 

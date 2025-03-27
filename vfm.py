@@ -13,7 +13,7 @@ class VFM(nn.Module):
         siglip_config: str = SIGLIP_CONFIG_FILE_PATH,
         resampler_config: str = RESAMPLER_CONFIG_FILE_PATH,
         dtype: torch.dtype = torch.bfloat16,
-        device: torch.device = torch.device("cuda"),
+        device: torch.device = torch.device(DEVICE),
     ):
         super().__init__()
         self.device = device
@@ -105,11 +105,11 @@ class VFM(nn.Module):
         vpm_state_dict_path: str = SIGLIP_STATE_DICT_PATH,
     ) -> None:
         self.resampler.load_state_dict(
-            torch.load(resampler_state_dict_path, weights_only=True),
+            torch.load(resampler_state_dict_path, weights_only=True, map_location=torch.device(DEVICE)), 
             strict=False # ignore missing keys 🌵
         )
         self.vpm.load_state_dict(
-            torch.load(vpm_state_dict_path, weights_only=True),
+            torch.load(vpm_state_dict_path, weights_only=True, map_location=torch.device(DEVICE)),
             strict=False # ignore missing keys 🌵
             ) 
 
