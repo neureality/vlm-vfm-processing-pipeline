@@ -367,7 +367,8 @@ class SiglipVisionEmbeddings(nn.Module):
         # Apply the patch attention mask
         for batch_idx in range(batch_size):
             # Get slice index as a Python integer, not a tensor
-            slice_idx = int(self.pre_computed_slice_indices[batch_idx].item())
+            # slice_idx = int(self.pre_computed_slice_indices[batch_idx].item())
+            slice_idx = int(self.pre_computed_slice_indices[batch_idx].long())
             p_attn_mask = patch_attention_mask[batch_idx]
             # Only select the positions we need based on the mask
             valid_positions = position_ids[batch_idx, :slice_idx]

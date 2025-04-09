@@ -12,7 +12,9 @@ class VFM(nn.Module):
         self,
         siglip_config: str = SIGLIP_CONFIG_FILE_PATH,
         resampler_config: str = RESAMPLER_CONFIG_FILE_PATH,
-        dtype: torch.dtype = torch.bfloat16,
+        # dtype: torch.dtype = torch.bfloat16,
+        # dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype = torch.float16,
         device: torch.device = torch.device("cuda"),
     ):
         super().__init__()
@@ -120,14 +122,15 @@ class VFM(nn.Module):
         # tgt_sizes: torch.Tensor,
     ) -> torch.Tensor:
         if all_pixel_values.dtype != self.dtype:
-            print(
-                f"Current dtype of all_pixel_values is {all_pixel_values.dtype}, Converting all_pixel_values to {self.dtype}"
-            )
+            # print(
+            #     f"Current dtype of all_pixel_values is {all_pixel_values.dtype}, Converting all_pixel_values to {self.dtype}"
+            # )
             all_pixel_values = all_pixel_values.to(self.dtype)
 
         vision_embedding = self.vpm(
             all_pixel_values, patch_attention_mask=patch_attn_mask
         ).last_hidden_state
+        print("vision_embedding.dtype", vision_embedding.dtype)
         vision_embedding = self.resampler(vision_embedding)
 
         return vision_embedding
