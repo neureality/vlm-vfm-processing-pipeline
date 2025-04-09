@@ -10,20 +10,20 @@ model = model.to(device="cuda", dtype=torch.bfloat16)
 model.eval()
 
 all_pixel_values = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/all_pixel_values.pkl",
+    "/home/odedh/nr_value_prop/submodules/vfm/test_data/all_pixel_values.pkl",
     weights_only=True,
     map_location="cuda",
 )
 patch_attn_mask = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/patch_attn_mask.pkl",
+    "/home/odedh/nr_value_prop/submodules/vfm/test_data/patch_attn_mask.pkl",
     weights_only=True,
     map_location="cuda",
 )
-tgt_sizes = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/tgt_sizes.pkl",
-    weights_only=True,
-    map_location="cuda",
-)
+# tgt_sizes = torch.load(
+#     "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/tgt_sizes.pkl",
+#     weights_only=True,
+#     map_location="cuda",
+# )
 
 with torch.inference_mode():
     vision_embedding = model(

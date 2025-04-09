@@ -2,34 +2,29 @@ import torch
 from vfm import VFM
 from scripts.torch_to_onnx import fix_onnx_fp16, convert_pytorch_to_onnx
 
-OPSET_VERSION = 13
-device = "cpu"
-dtype = torch.float32
+OPSET_VERSION = 15  # ONNX opset version 15 or higher to properly support bfloat16
+device = "cuda" if torch.cuda.is_available() else "cpu"
+dtype = torch.bfloat16
 # Instantiate the model
-model = VFM(device=device, dtype=dtype)
-model.eval()  # Set model to evaluation mode
+model = VFM()
+model = model.to(device=device, dtype=dtype)
+model.eval()
 
 all_pixel_values = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/all_pixel_values.pkl",
+    "/home/odedh/nr_value_prop/submodules/vfm/test_data/all_pixel_values.pkl",
     weights_only=True,
-    map_location=device,
-)
+    map_location=torch.device(device),
+).to(torch.bfloat16)
 patch_attn_mask = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/patch_attn_mask.pkl",
+    "/home/odedh/nr_value_prop/submodules/vfm/test_data/patch_attn_mask.pkl",
     weights_only=True,
-    map_location=device,
-)
-tgt_sizes = torch.load(
-    "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/tgt_sizes.pkl",
-    weights_only=True,
-    map_location=device,
+    map_location=torch.device(device),
 )
 
 # Set dynamic axes for inputs/outputs
 dynamic_axes = {
     "all_pixel_values": {0: "batch_size"},
     "patch_attn_mask": {0: "batch_size"},
-    # "tgt_sizes": {0: "batch_size"},
     "vision_embedding": {0: "batch_size"},
 }
 
@@ -38,13 +33,11 @@ convert_pytorch_to_onnx(
     input_sample=(
         all_pixel_values,
         patch_attn_mask,
-        # tgt_sizes
     ),
-    onnx_path="models/vfm.onnx",
+    onnx_path="models/vfm_bfloat16.onnx",
     input_names=[
         "all_pixel_values",
         "patch_attn_mask",
-        # "tgt_sizes"
     ],
     output_names=["vision_embedding"],
     dynamic_axes=dynamic_axes,
@@ -61,5 +54,5 @@ convert_pytorch_to_onnx(
 # Fix the ONNX model for mixed precision
 fp16_model_name = fix_onnx_fp16(
     gen_models_path="models",
-    model_base_name="vfm",
+    model_base_name="vfm_bfloat16",
 )
