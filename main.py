@@ -13,7 +13,7 @@ all_pixel_values = torch.load(
     "/home/odedh/nr_value_prop/submodules/vfm/test_data/all_pixel_values.pkl",
     weights_only=True,
     map_location="cuda",
-)
+).to(torch.float32)
 patch_attn_mask = torch.load(
     "/home/odedh/nr_value_prop/submodules/vfm/test_data/patch_attn_mask.pkl",
     weights_only=True,
