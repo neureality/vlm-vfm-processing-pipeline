@@ -3,10 +3,10 @@ from vfm import VFM
 from scripts.torch_to_onnx import fix_onnx_fp16, convert_pytorch_to_onnx
 
 OPSET_VERSION = 15  # ONNX opset version 15 or higher to properly support bfloat16 (move back to 13 when QPC)
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda"
 dtype = torch.bfloat16
 # Instantiate the model
-model = VFM(dtype=dtype) # TODO: Fix the dtype issue when u need to specify it twice
+model = VFM(dtype=dtype)  # TODO: Fix the dtype issue when u need to specify it twice
 model = model.to(device=device, dtype=dtype)
 model.eval()
 

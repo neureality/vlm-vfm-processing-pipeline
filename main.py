@@ -3,9 +3,9 @@ import torch
 import os
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
-
-model = VFM()
+dtype = torch.bfloat16
+device = "cuda"
+model = VFM(dtype=dtype)  # TODO: Fix the dtype issue when u need to specify it twice
 model = model.to(device="cuda", dtype=torch.bfloat16)
 model.eval()
 
@@ -19,16 +19,11 @@ patch_attn_mask = torch.load(
     weights_only=True,
     map_location="cuda",
 )
-# tgt_sizes = torch.load(
-#     "/home/ubuntu/vlm-vfm-processing-pipeline/test_data/tgt_sizes.pkl",
-#     weights_only=True,
-#     map_location="cuda",
-# )
 
 with torch.inference_mode():
     vision_embedding = model(
         all_pixel_values,
         patch_attn_mask,
         # tgt_sizes
-        )
+    )
 pass
