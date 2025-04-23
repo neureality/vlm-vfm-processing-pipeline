@@ -119,12 +119,7 @@ class VFM(nn.Module):
         patch_attn_mask: torch.Tensor,
         # tgt_sizes: torch.Tensor,
     ) -> torch.Tensor:
-        if all_pixel_values.dtype != self.dtype:
-            print(
-                f"Current dtype of all_pixel_values is {all_pixel_values.dtype}, Converting all_pixel_values to {self.dtype}"
-            )
-            all_pixel_values = all_pixel_values.to(self.dtype)
-
+        all_pixel_values = all_pixel_values.to(self.dtype)
         vision_embedding = self.vpm(
             all_pixel_values, patch_attention_mask=patch_attn_mask
         ).last_hidden_state
