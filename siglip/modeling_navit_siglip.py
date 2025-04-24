@@ -332,7 +332,10 @@ class SiglipVisionEmbeddings(nn.Module):
     
     def _pre_compute_position_ids(self):
         batch_size = self.batch_size
-        position_ids = torch.zeros(batch_size, self.num_patches, dtype=torch.long)
+        position_ids = torch.full(
+            size=(batch_size, self.pixel_values_shape[1] // self.patch_size * self.pixel_values_shape[2] // self.patch_size),
+            fill_value=0
+            )
         
         # Boundaries calculation (moved to CPU for pre-computation)
         boundaries = torch.arange(1 / self.num_patches_per_side, 1.0, 1 / self.num_patches_per_side)
@@ -364,6 +367,8 @@ class SiglipVisionEmbeddings(nn.Module):
         # Use pre-computed position IDs, moved to the current device
         position_ids = self.pre_computed_position_ids.to(self.device)
         
+        embeddings = embeddings + self.position_embedding(position_ids)
+        return embeddings
         # Apply the patch attention mask
         for batch_idx in range(batch_size):
             # Get slice index as a Python integer, not a tensor
@@ -939,7 +944,7 @@ class SiglipVisionTransformer(SiglipPreTrainedModel):
                 if not self._use_flash_attention_2
                 else patch_attention_mask
             )
-
+        # TODO: continue from here
         encoder_outputs = self.encoder(
             inputs_embeds=hidden_states,
             attention_mask=attention_mask,

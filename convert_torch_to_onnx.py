@@ -2,9 +2,11 @@ import torch
 from vfm import VFM
 from scripts.torch_to_onnx import fix_onnx_fp16, convert_pytorch_to_onnx
 
-OPSET_VERSION = 15  # ONNX opset version 15 or higher to properly support bfloat16 (move back to 13 when QPC)
+IS_FOR_QPC_BUILD = True
+
+OPSET_VERSION = 13 if IS_FOR_QPC_BUILD else 15  # ONNX opset version 15 or higher to properly support bfloat16 (move back to 13 when QPC)
 device = "cuda"
-dtype = torch.bfloat16
+dtype = torch.float32 if IS_FOR_QPC_BUILD else torch.bfloat16  # Use float32 for QPC build
 # Instantiate the model
 model = VFM(dtype=dtype)  # TODO: Fix the dtype issue when u need to specify it twice
 model = model.to(device=device, dtype=dtype)
@@ -34,7 +36,7 @@ convert_pytorch_to_onnx(
         all_pixel_values,
         patch_attn_mask,
     ),
-    onnx_path="models/vfm_bf16.onnx",
+    onnx_path=f"models/vfm_{'f32' if IS_FOR_QPC_BUILD else 'bf16'}.onnx",
     input_names=[
         "all_pixel_values",
         "patch_attn_mask",
@@ -54,5 +56,5 @@ convert_pytorch_to_onnx(
 # Fix the ONNX model for mixed precision
 fp16_model_name = fix_onnx_fp16(
     gen_models_path="models",
-    model_base_name="vfm_bf16",
+    model_base_name=f"vfm_{'f32' if IS_FOR_QPC_BUILD else 'bf16'}",
 )

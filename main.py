@@ -6,7 +6,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 dtype = torch.bfloat16
 device = "cuda"
 model = VFM(dtype=dtype)  # TODO: Fix the dtype issue when u need to specify it twice
-model = model.to(device="cuda", dtype=torch.bfloat16)
+model = model.to(device="cuda", dtype=dtype)
 model.eval()
 
 all_pixel_values = torch.load(

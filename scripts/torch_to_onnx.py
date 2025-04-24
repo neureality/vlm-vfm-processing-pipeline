@@ -161,7 +161,7 @@ def convert_pytorch_to_onnx(
         # Create an ONNXRuntime session
         session_options = ort.SessionOptions()
         session_options.graph_optimization_level = (
-            ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            ort.GraphOptimizationLevel.ORT_DISABLE_ALL
         )
         session = ort.InferenceSession(onnx_path, session_options)
 
@@ -180,7 +180,7 @@ def convert_pytorch_to_onnx(
 
         # Optional: Compare PyTorch and ONNX outputs
         with torch.no_grad():
-            torch_outputs = model(input_sample)
+            torch_outputs = model(input_sample[0], input_sample[1])
 
         if isinstance(torch_outputs, (list, tuple)):
             for i, (torch_out, ort_out) in enumerate(zip(torch_outputs, ort_outputs)):
