@@ -5,20 +5,22 @@ from scripts.torch_to_onnx import fix_onnx_fp16, convert_pytorch_to_onnx
 IS_FOR_QPC_BUILD = True
 
 OPSET_VERSION = 13 if IS_FOR_QPC_BUILD else 15  # ONNX opset version 15 or higher to properly support bfloat16 (move back to 13 when QPC)
-device = "cuda"
+device = "cpu"
 dtype = torch.float32 if IS_FOR_QPC_BUILD else torch.bfloat16  # Use float32 for QPC build
 # Instantiate the model
-model = VFM(dtype=dtype)  # TODO: Fix the dtype issue when u need to specify it twice
+model = VFM(dtype=dtype, device=device)  # TODO: Fix the dtype issue when u need to specify it twice
 model = model.to(device=device, dtype=dtype)
 model.eval()
 
 all_pixel_values = torch.load(
-    "/home/odedh/nr_value_prop/submodules/vfm/test_data/all_pixel_values.pkl",
+    # "/home/odedh/nr_value_prop/submodules/vfm/test_data/all_pixel_values.pkl",
+    "/home/odedh/nr_value_prop/all_pixel_values_ski.pth",
     weights_only=True,
     map_location=torch.device(device),
 ).to(torch.float32)
 patch_attn_mask = torch.load(
-    "/home/odedh/nr_value_prop/submodules/vfm/test_data/patch_attn_mask.pkl",
+    # "/home/odedh/nr_value_prop/submodules/vfm/test_data/patch_attn_mask.pkl",
+    "/home/odedh/nr_value_prop/ski_patch_attn_mask.pth",
     weights_only=True,
     map_location=torch.device(device),
 )
