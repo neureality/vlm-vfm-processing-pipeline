@@ -105,11 +105,11 @@ class VFM(nn.Module):
         vpm_state_dict_path: str = SIGLIP_STATE_DICT_PATH,
     ) -> None:
         self.resampler.load_state_dict(
-            torch.load(resampler_state_dict_path, weights_only=True),
+            torch.load(resampler_state_dict_path, weights_only=True, map_location=self.device),
             strict=False # ignore missing keys 🌵
         )
         self.vpm.load_state_dict(
-            torch.load(vpm_state_dict_path, weights_only=True),
+            torch.load(vpm_state_dict_path, weights_only=True, map_location=self.device),
             strict=False # ignore missing keys 🌵
             ) 
 
