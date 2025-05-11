@@ -1,3 +1,4 @@
+import os
 import torch
 from torch import nn
 from transformers import AutoConfig
@@ -16,10 +17,11 @@ class VFM(nn.Module):
         device: torch.device = torch.device("cuda"),
     ):
         super().__init__()
+        self.base_path =  self.base_path = os.path.dirname(__file__)
         self.device = device
         self.dtype = dtype
-        self.siglip_config = AutoConfig.from_pretrained(siglip_config)
-        self.resampler_config = AutoConfig.from_pretrained(resampler_config)
+        self.siglip_config = AutoConfig.from_pretrained(os.path.join(self.base_path, siglip_config))
+        self.resampler_config = AutoConfig.from_pretrained(os.path.join(self.base_path, resampler_config))
         # Pre Compute tgt_sizes 🌵
         pre_computed_tgt_sizes = self._pre_compute_tgt_sizes(self.siglip_config)
         self.register_buffer("pre_computed_tgt_sizes", pre_computed_tgt_sizes)
@@ -105,11 +107,15 @@ class VFM(nn.Module):
         vpm_state_dict_path: str = SIGLIP_STATE_DICT_PATH,
     ) -> None:
         self.resampler.load_state_dict(
-            torch.load(resampler_state_dict_path, weights_only=True, map_location=self.device),
+            torch.load(os.path.join(self.base_path, resampler_state_dict_path),
+                       weights_only=True,
+                       map_location=self.device),
             strict=False # ignore missing keys 🌵
         )
         self.vpm.load_state_dict(
-            torch.load(vpm_state_dict_path, weights_only=True, map_location=self.device),
+            torch.load(os.path.join(self.base_path, vpm_state_dict_path),
+                       weights_only=True,
+                       map_location=self.device),
             strict=False # ignore missing keys 🌵
             ) 
 
