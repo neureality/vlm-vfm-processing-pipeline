@@ -294,14 +294,14 @@ class SiglipVisionModelOutput(ModelOutput):
 
 
 class SiglipVisionEmbeddings(nn.Module):
-    def __init__(self, config: SiglipVisionConfig, pre_computed_tgt_sizes=None):
+    def __init__(self, config: SiglipVisionConfig, pre_computed_tgt_sizes=None, batch_size=30):
         super().__init__()
         self.config = config
         self.embed_dim = config.hidden_size
         self.image_size = config.image_size
         self.patch_size = config.patch_size
         self.pixel_values_shape = config.pixel_values_shape # Set for 720x1280 HD videos only.
-        self.batch_size = config.batch_size
+        self.batch_size = batch_size
         self.device = None
         self.register_buffer("pre_computed_tgt_sizes", pre_computed_tgt_sizes) # Pre-computed tgt_sizes 🌵
         
@@ -323,7 +323,7 @@ class SiglipVisionEmbeddings(nn.Module):
         
         # Pre-compute slice indices (total number of patches per batch element) 🌵
         slice_indices = []
-        for batch_idx in range(config.batch_size):
+        for batch_idx in range(self.batch_size):
             h, w = self.pre_computed_tgt_sizes[batch_idx].tolist()
             slice_indices.append(h * w)  # Total number of patches
         
@@ -879,12 +879,13 @@ class SiglipVisionTransformer(SiglipPreTrainedModel):
     _supports_flash_attn_2 = True
     _no_split_modules = []
 
-    def __init__(self, config: SiglipVisionConfig, pre_computed_tgt_sizes=None):
+    def __init__(self, config: SiglipVisionConfig, pre_computed_tgt_sizes=None, batch_size=30):
         super().__init__(config)
         self.config = config
         embed_dim = config.hidden_size
+        self.batch_size = batch_size
 
-        self.embeddings = SiglipVisionEmbeddings(config, pre_computed_tgt_sizes)
+        self.embeddings = SiglipVisionEmbeddings(config, pre_computed_tgt_sizes, batch_size)
         self.encoder = SiglipEncoder(config)
         self.post_layernorm = nn.LayerNorm(embed_dim, eps=config.layer_norm_eps)
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"

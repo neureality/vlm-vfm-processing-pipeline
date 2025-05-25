@@ -13,6 +13,7 @@ class VFM(nn.Module):
         self,
         siglip_config: str = SIGLIP_CONFIG_FILE_PATH,
         resampler_config: str = RESAMPLER_CONFIG_FILE_PATH,
+        batch_size: int = 30,
         dtype: torch.dtype = torch.bfloat16,
         device: torch.device = torch.device("cuda"),
     ):
@@ -20,6 +21,7 @@ class VFM(nn.Module):
         self.base_path =  self.base_path = os.path.dirname(__file__)
         self.device = device
         self.dtype = dtype
+        self.batch_size = batch_size
         self.siglip_config = AutoConfig.from_pretrained(os.path.join(self.base_path, siglip_config))
         self.resampler_config = AutoConfig.from_pretrained(os.path.join(self.base_path, resampler_config))
         # Pre Compute tgt_sizes 🌵
@@ -40,7 +42,8 @@ class VFM(nn.Module):
             self.siglip_config._attn_implementation = "eager"
         model = SiglipVisionTransformer(
             self.siglip_config,
-            self.pre_computed_tgt_sizes
+            self.pre_computed_tgt_sizes,
+            self.batch_size,
             )
         if self.siglip_config.drop_vision_last_layer:
             model.encoder.layers = model.encoder.layers[:-1]
@@ -65,7 +68,7 @@ class VFM(nn.Module):
 
     def _pre_compute_tgt_sizes(self, config):
         # 1. Parse relevant config entries
-        batch_size = config.batch_size                # e.g. 30
+        batch_size = self.batch_size                # e.g. 30
         patch_size = config.patch_size                # e.g. 14
         resize_global = config.resize_global          # e.g. [336, 602]
         resize_refine = config.resize_refine          # e.g. [476, 840]
@@ -125,7 +128,7 @@ class VFM(nn.Module):
         patch_attn_mask: torch.Tensor,
         # tgt_sizes: torch.Tensor,
     ) -> torch.Tensor:
-        all_pixel_values = all_pixel_values.to(self.dtype)
+        # all_pixel_values = all_pixel_values.to(self.dtype)
         vision_embedding = self.vpm(
             all_pixel_values, patch_attention_mask=patch_attn_mask
         ).last_hidden_state
